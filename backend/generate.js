@@ -1,7 +1,7 @@
 /**
  * Route de génération de contenu LinkedIn
  * Utilise Claude Haiku (modèle le moins coûteux) pour générer :
- * 1. Un post LinkedIn structuré (Hook → Développement → Conclusion)
+ * 1. Un post LinkedIn structuré (Hook → Développement → Conclusion + Sources)
  * 2. Une configuration visuelle unique pour chaque génération
  */
 
@@ -23,7 +23,7 @@ export async function generateContent(req, res) {
   try {
     const { subject, context, documentText, tone = 'professionnel' } = req.body;
 
-    // ── Validation des inputs ─────────────────────────────────────────────────
+    // ── Validation ────────────────────────────────────────────────────────────
     if (!subject || subject.trim().length < 5) {
       return res.status(400).json({ error: 'Le sujet doit contenir au moins 5 caractères.' });
     }
@@ -51,19 +51,23 @@ Tu génères du contenu professionnel, engageant et authentique.
 Tu réponds UNIQUEMENT en JSON valide, sans markdown, sans backticks.
 Aucun CTA, aucune invitation à commenter, partager, liker ou suivre.
 La dernière phrase du post est toujours une conclusion, jamais un appel à l'action.
+Quand tu cites des chiffres ou anecdotes, tu fournis toujours leur source réelle (auteur, publication, année).
+Si aucune source vérifiable n'existe, n'invente pas le chiffre.
 Structure exacte requise :
 {
   "post": {
     "hook": "première phrase accrocheuse (max 20 mots)",
     "body": "développement en 3-4 paragraphes courts",
     "hashtags": ["hashtag1", "hashtag2", "hashtag3"],
-    "emoji": "1 emoji pertinent maximum"
+    "emoji": "1 emoji pertinent maximum",
+    "sources": ["Auteur ou organisme, Titre ou étude, Année", "..."]
   },
   "visual": {
     "headline": "titre court et percutant (max 8 mots)",
     "subheadline": "sous-titre explicatif (max 15 mots)",
-    "keyPoint": "point clé à retenir (max 12 mots)",
-    "stat": "statistique ou chiffre impactant si pertinent (optionnel)"
+    "points": [
+      { "stat": "chiffre ou % impactant", "label": "explication courte (max 10 mots)", "source": "Source courte" }
+    ]
   }
 }`,
       messages: [{ role: 'user', content: userPrompt }],
@@ -86,6 +90,7 @@ Structure exacte requise :
       post: formatLinkedInPost(parsed.post),
       visual: visualConfig,
       rawVisualData: parsed.visual,
+      rawPostData: parsed.post,
       meta: {
         model: 'claude-haiku-4-5',
         tokens: message.usage,
@@ -109,10 +114,11 @@ Structure exacte requise :
 }
 
 /**
- * Formate le post LinkedIn — sans CTA
+ * Formate le post LinkedIn avec bloc sources — sans CTA
  */
 function formatLinkedInPost(post) {
   if (!post) return '';
+
   const parts = [
     post.emoji ? `${post.emoji} ${post.hook}` : post.hook,
     '',
@@ -120,5 +126,13 @@ function formatLinkedInPost(post) {
     '',
     post.hashtags?.map(h => `#${h.replace(/^#/, '')}`).join(' ') || '',
   ];
+
+  // Ajout du bloc sources si présentes
+  if (post.sources && post.sources.length > 0) {
+    parts.push('');
+    parts.push('──');
+    parts.push('Sources : ' + post.sources.join(' · '));
+  }
+
   return parts.filter(p => p !== undefined).join('\n');
 }
