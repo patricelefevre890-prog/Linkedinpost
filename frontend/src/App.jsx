@@ -206,19 +206,16 @@ function LinkedInVisual({ config, svgRef }) {
   );
 }
 
-// ── Appel via Netlify Function — sans CTA, avec sources ───────────────────────
-async function callClaude(subject, context, documentText, tone) {
+async function callClaude(subject, context, documentText, tone, url) {
   const res = await fetch("/.netlify/functions/generate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ subject, context, documentText, tone }),
+    body: JSON.stringify({ subject, context, documentText, tone, url }),
   });
-
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || `Erreur ${res.status}`);
   }
-
   return res.json();
 }
 
@@ -239,24 +236,11 @@ function formatPost(post) {
   return parts.filter(p => p !== undefined).join("\n");
 }
 
-function downloadSVG(svgRef) {
-  const svg = svgRef.current;
-  if (!svg) return;
-  const serializer = new XMLSerializer();
-  const svgStr = serializer.serializeToString(svg);
-  const blob = new Blob([svgStr], { type: "image/svg+xml" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `linkedin-visuel-${Date.now()}.svg`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
 export default function App() {
   const [subject, setSubject] = useState("");
   const [context, setContext] = useState("");
   const [documentText, setDocumentText] = useState("");
+  const [url, setUrl] = useState("");
   const [tone, setTone] = useState("professionnel");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -282,7 +266,7 @@ export default function App() {
     if (!subject.trim() || subject.trim().length < 5) { setError("Le sujet doit contenir au moins 5 caractères."); return; }
     setError(""); setLoading(true); setResult(null); setVisualConfig(null);
     try {
-      const data = await callClaude(subject, context, documentText, tone);
+      const data = await callClaude(subject, context, documentText, tone, url);
       setResult({ post: formatPost(data.post), rawData: data });
       setVisualConfig(generateVisualConfig(data.visual));
       setStep("result");
@@ -317,10 +301,7 @@ export default function App() {
               <div style={{ borderRadius:12, overflow:"hidden", border:"1px solid #E5E7EB", boxShadow:"0 4px 16px rgba(0,0,0,0.07)" }}>
                 <LinkedInVisual config={visualConfig} svgRef={svgRef}/>
               </div>
-              <div style={{ display:"flex", gap:10, marginTop:10 }}>
-                <button onClick={() => setVisualConfig(generateVisualConfig(result.rawData.visual))} style={{ flex:1, padding:"11px 14px", background:"#fff", border:"1.5px solid #E5E7EB", borderRadius:9, fontSize:13, fontWeight:600, color:"#374151", cursor:"pointer", fontFamily:"inherit" }}>🔄 Nouveau layout</button>
-                <button onClick={() => downloadSVG(svgRef)} style={{ flex:1, padding:"11px 14px", background:BRAND.green, border:"none", borderRadius:9, fontSize:13, fontWeight:600, color:"#fff", cursor:"pointer", fontFamily:"inherit" }}>⬇️ Télécharger SVG</button>
-              </div>
+              <button onClick={() => setVisualConfig(generateVisualConfig(result.rawData.visual))} style={{ width:"100%", marginTop:10, padding:"11px 14px", background:"#fff", border:"1.5px solid #E5E7EB", borderRadius:9, fontSize:13, fontWeight:600, color:"#374151", cursor:"pointer", fontFamily:"inherit" }}>🔄 Nouveau layout</button>
             </div>
 
             <div>
@@ -382,6 +363,7 @@ export default function App() {
         </div>
 
         <div style={{ background:"#fff", borderRadius:18, border:"1px solid #E5E7EB", padding:36, boxShadow:"0 4px 20px rgba(0,0,0,0.05)" }}>
+
           <div style={{ marginBottom:22 }}>
             <label style={{ display:"block", fontSize:11, fontWeight:700, color:"#1F2937", marginBottom:8, textTransform:"uppercase", letterSpacing:"0.6px" }}>Sujet du post *</label>
             <textarea value={subject} onChange={e => setSubject(e.target.value.substring(0,500))} placeholder="Ex: L'importance de la musique dans un bar..." rows={3} style={{ width:"100%", padding:"12px 14px", border:`1.5px solid ${subject.length>0?BRAND.green:"#E5E7EB"}`, borderRadius:10, outline:"none", resize:"vertical", fontFamily:"inherit", fontSize:14, boxSizing:"border-box", lineHeight:1.6 }}/>
@@ -401,8 +383,17 @@ export default function App() {
           </div>
 
           <div style={{ marginBottom:22 }}>
+            <label style={{ display:"block", fontSize:11, fontWeight:700, color:"#1F2937", marginBottom:8, textTransform:"uppercase", letterSpacing:"0.6px" }}>URL de référence (optionnel)</label>
+            <div style={{ position:"relative" }}>
+              <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:16 }}>🔗</span>
+              <input type="url" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://exemple.com/article..." style={{ width:"100%", padding:"12px 14px 12px 36px", border:`1.5px solid ${url?BRAND.green:"#E5E7EB"}`, borderRadius:10, outline:"none", fontFamily:"inherit", fontSize:14, boxSizing:"border-box" }}/>
+            </div>
+            {url && <p style={{ margin:"5px 0 0", fontSize:11, color:BRAND.green }}>✓ Le contenu de cette page sera analysé</p>}
+          </div>
+
+          <div style={{ marginBottom:22 }}>
             <label style={{ display:"block", fontSize:11, fontWeight:700, color:"#1F2937", marginBottom:8, textTransform:"uppercase", letterSpacing:"0.6px" }}>Document de référence (optionnel)</label>
-            <div onClick={() => fileRef.current?.click()} onDragOver={e => { e.preventDefault(); setDragOver(true); }} onDragLeave={() => setDragOver(false)} onDrop={e => { e.preventDefault(); setDragOver(false); handleFile(e.dataTransfer.files[0]); }} style={{ border:`2px dashed ${dragOver||fileName?BRAND.green:"#E5E7EB"}`, borderRadius:12, padding:"22px 20px", background: dragOver||fileName?"rgba(0,184,43,0.04)":"#F9FAFB", cursor:"pointer", textAlign:"center" }}>
+            <div onClick={() => fileRef.current?.click()} onDragOver={e => { e.preventDefault(); setDragOver(true); }} onDragLeave={() => setDragOver(false)} onDrop={e => { e.preventDefault(); setDragOver(false); handleFile(e.dataTransfer.files[0]); }} style={{ border:`2px dashed ${dragOver||fileName?BRAND.green:"#E5E7EB"}`, borderRadius:12, padding:"20px", background: dragOver||fileName?"rgba(0,184,43,0.04)":"#F9FAFB", cursor:"pointer", textAlign:"center" }}>
               {fileName ? <div><span style={{ fontSize:20 }}>📄</span><p style={{ margin:"8px 0 0", fontSize:14, fontWeight:600, color:BRAND.green }}>{fileName}</p><p style={{ margin:"4px 0 0", fontSize:12, color:"#9CA3AF" }}>{documentText.length} caractères</p></div>
               : <div><span style={{ fontSize:26 }}>📎</span><p style={{ margin:"8px 0 4px", fontSize:14, fontWeight:500, color:"#4B5563" }}>Glissez ou cliquez</p><p style={{ margin:0, fontSize:12, color:"#9CA3AF" }}>TXT, MD (max 5 MB)</p></div>}
               <input ref={fileRef} type="file" accept=".txt,.md" onChange={e => handleFile(e.target.files[0])} style={{ display:"none" }}/>
@@ -420,16 +411,6 @@ export default function App() {
             {loading ? <><Spinner/> Génération en cours...</> : "✨ Générer le contenu LinkedIn"}
           </button>
           <p style={{ textAlign:"center", fontSize:11, color:"#9CA3AF", margin:"10px 0 0" }}>Claude Haiku · ~$0.0008 par génération</p>
-        </div>
-
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:14, marginTop:24 }}>
-          {[["🎨","Visuels sourcés","Chiffres + sources dans l'image"],["✍️","Sans CTA","Post qui conclut, jamais qui sollicite"],["💰","Coût minimal","Claude Haiku, le moins cher"]].map(([ic,t,d]) => (
-            <div key={t} style={{ background:"#fff", borderRadius:12, padding:"18px 14px", border:"1px solid #E5E7EB", textAlign:"center" }}>
-              <span style={{ fontSize:24 }}>{ic}</span>
-              <p style={{ margin:"8px 0 4px", fontSize:13, fontWeight:700 }}>{t}</p>
-              <p style={{ margin:0, fontSize:11, color:"#4B5563" }}>{d}</p>
-            </div>
-          ))}
         </div>
       </main>
     </div>
