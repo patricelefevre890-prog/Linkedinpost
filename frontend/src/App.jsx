@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback } from "react";
+import * as htmlToImage from "html-to-image";
 
 const BRAND = {
   green: "#00B82B", greenDark: "#009622", black: "#0A0A0A", white: "#FFFFFF",
@@ -7,263 +8,169 @@ const BRAND = {
 };
 
 const LAYOUTS = [
-  "hero-centered","diagonal-split","sidebar-accent",
-  "top-bar","bottom-accent","frame-border","full-green-inverse","grid-minimal",
+  "data-dark", "data-light", "data-green",
+  "hero-centered", "sidebar-accent", "bottom-accent", "frame-border", "top-bar",
 ];
 
 function pickRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
+function truncate(text, max) {
+  if (!text) return "";
+  return text.length > max ? text.substring(0, max - 1) + "…" : text;
+}
+
 function generateVisualConfig(visualData) {
   return {
     layout: pickRandom(LAYOUTS),
-    headlineSize: pickRandom([44, 50, 56]),
-    padding: pickRandom([48, 56, 64]),
+    headlineSize: pickRandom([48, 56, 64]),
     content: {
       headline: visualData?.headline || "Votre titre ici",
       subheadline: visualData?.subheadline || "",
       points: visualData?.points || [],
     },
-    decorative: {
-      showCircle: Math.random() > 0.4,
-      showDots: Math.random() > 0.5,
-      circleSize: pickRandom([100, 140, 180]),
-      circlePos: pickRandom(["top-right", "bottom-left", "bottom-right"]),
-    },
   };
 }
 
-function splitText(text, maxChars) {
-  if (!text) return [""];
-  const words = text.split(" ");
-  const lines = [];
-  let current = "";
-  for (const word of words) {
-    const candidate = (current + " " + word).trim();
-    if (candidate.length <= maxChars) { current = candidate; }
-    else { if (current) lines.push(current); current = word; }
-  }
-  if (current) lines.push(current);
-  return lines.length ? lines : [""];
-}
-
-// Tronque un texte à maxChars caractères avec ...
-function truncate(text, maxChars) {
-  if (!text) return "";
-  return text.length > maxChars ? text.substring(0, maxChars - 1) + "…" : text;
-}
-
-function LinkedInVisual({ config, svgRef }) {
+// ── Rendu HTML du visuel (1200×700) ──────────────────────────────────────────
+function LinkedInVisual({ config, visRef }) {
   if (!config) return null;
-  // Hauteur augmentée à 700 pour loger 3 cartes confortablement
-  const W = 1200, H = 700;
-  const { layout, headlineSize: hs, padding, content, decorative } = config;
-  const isDark = ["hero-centered","full-green-inverse","bottom-accent"].includes(layout);
-  const isGreen = ["hero-centered","full-green-inverse"].includes(layout);
-
-  const circleEl = decorative.showCircle ? (() => {
-    const s = decorative.circleSize;
-    const pos = decorative.circlePos;
-    const cx = pos.includes("right") ? W - s * 0.3 : s * 0.3;
-    const cy = pos.includes("top") ? s * 0.3 : H - s * 0.3;
-    const fill = isGreen ? "rgba(0,0,0,0.1)" : isDark ? "rgba(255,255,255,0.07)" : "rgba(0,184,43,0.07)";
-    return <circle cx={cx} cy={cy} r={s} fill={fill}/>;
-  })() : null;
-
-  const dotsEl = decorative.showDots ? (() => {
-    const fillColor = isDark ? "rgba(255,255,255,0.15)" : "rgba(0,184,43,0.2)";
-    const dots = [];
-    for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++)
-      dots.push(<circle key={`${r}-${c}`} cx={W-110+c*20} cy={H-90+r*20} r={2.5} fill={fillColor}/>);
-    return <>{dots}</>;
-  })() : null;
-
-  const headlines = splitText(content.headline, 24);
+  const { layout, headlineSize, content } = config;
   const points = content.points || [];
 
-  // Layout enrichi avec données — hauteur 700px, 3 cartes bien espacées
-  const renderDataLayout = () => {
-    const textColor = isDark ? BRAND.white : BRAND.black;
-    const textMuted = isDark ? "rgba(255,255,255,0.5)" : BRAND.gray600;
-    const cardBg = isDark ? "rgba(255,255,255,0.04)" : "rgba(0,184,43,0.04)";
+  const base = {
+    width: 1200, height: 700, position: "relative", overflow: "hidden",
+    fontFamily: "'Inter', -apple-system, sans-serif",
+  };
 
-    // Subheadline tronqué à 40 chars max pour le label du haut
-    const subLabel = truncate(content.subheadline?.toUpperCase() || "LINKEDIN CONTENT", 40);
+  // ── Layout avec données chiffrées ─────────────────────────────────────────
+  const DataLayout = ({ bg, textColor, mutedColor, cardBg, borderColor, labelColor, footerBg }) => (
+    <div ref={visRef} style={{ ...base, background: bg, display: "flex" }}>
+      {/* Barre verte top si fond sombre */}
+      {bg !== BRAND.white && <div style={{ position:"absolute", top:0, left:0, right:0, height:8, background:BRAND.green }}/>}
 
-    // Headline sur 2 lignes max
-    const headlineLines = splitText(content.headline, 20).slice(0, 3);
-    const headY = 140;
-    const cardHeight = 168;
-    const cardGap = 16;
-    const cardStartY = 40;
+      {/* Colonne gauche */}
+      <div style={{ width:520, padding:"60px 0 60px 64px", display:"flex", flexDirection:"column", justifyContent:"center", flexShrink:0 }}>
+        <div style={{ fontSize:12, fontWeight:700, color:BRAND.green, letterSpacing:"2px", marginBottom:12, textTransform:"uppercase" }}>
+          {truncate(content.subheadline, 38)}
+        </div>
+        <div style={{ width:40, height:3, background:BRAND.green, borderRadius:2, marginBottom:28 }}/>
+        <div style={{ fontSize:headlineSize, fontWeight:900, lineHeight:1.1, letterSpacing:"-2px", color:textColor }}>
+          {content.headline.split(" ").slice(0, Math.ceil(content.headline.split(" ").length / 2)).join(" ")}
+          <span style={{ color:BRAND.green, display:"block" }}>
+            {content.headline.split(" ").slice(Math.ceil(content.headline.split(" ").length / 2)).join(" ")}
+          </span>
+        </div>
+      </div>
 
-    return <>
-      <rect width={W} height={H} fill={isDark ? BRAND.black : BRAND.white}/>
-      {isDark && <rect width={W} height={8} fill={BRAND.green}/>}
-      {circleEl}
+      {/* Séparateur */}
+      <div style={{ width:1, background:borderColor, flexShrink:0, margin:"30px 0" }}/>
 
-      {/* Label haut gauche — tronqué */}
-      <text x={64} y={isDark ? 76 : 56} fontFamily="Inter,sans-serif" fontWeight={700} fontSize={12} fill={BRAND.green} letterSpacing="1">
-        {subLabel}
-      </text>
-      <rect x={64} y={isDark ? 88 : 68} width={40} height={3} fill={BRAND.green} rx={2}/>
-
-      {/* Headline principale */}
-      {headlineLines.map((line, i) => (
-        <text key={i} x={64} y={headY + i * hs * 1.2} fontFamily="Inter,sans-serif" fontWeight={900} fontSize={hs} fill={i === headlineLines.length - 1 ? BRAND.green : textColor} letterSpacing="-1.5">
-          {line}
-        </text>
-      ))}
-
-      {/* Séparateur vertical */}
-      <line x1={540} y1={30} x2={540} y2={H-50} stroke={isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"} strokeWidth={1}/>
-
-      {/* 3 cartes de données à droite — bien espacées */}
-      {points.slice(0, 3).map((pt, i) => {
-        const cardY = cardStartY + i * (cardHeight + cardGap);
-        return (
-          <g key={i}>
-            <rect x={572} y={cardY} width={592} height={cardHeight} rx={10} fill={cardBg}/>
-            <rect x={572} y={cardY} width={5} height={cardHeight} rx={2} fill={BRAND.green}/>
-            {/* Stat */}
-            <text x={600} y={cardY + 62} fontFamily="Inter,sans-serif" fontWeight={900} fontSize={50} fill={BRAND.green}>
-              {truncate(pt.stat, 10)}
-            </text>
-            {/* Label — tronqué à 45 chars */}
-            <text x={600} y={cardY + 98} fontFamily="Inter,sans-serif" fontWeight={600} fontSize={16} fill={textColor}>
-              {truncate(pt.label, 45)}
-            </text>
-            {/* Source — tronquée à 50 chars */}
-            <text x={600} y={cardY + 124} fontFamily="Inter,sans-serif" fontWeight={400} fontSize={12} fill={textMuted}>
-              {truncate(pt.source, 50)}
-            </text>
-          </g>
-        );
-      })}
+      {/* Colonne droite : 3 cartes */}
+      <div style={{ flex:1, padding:"28px 32px 28px 28px", display:"flex", flexDirection:"column", gap:14 }}>
+        {points.slice(0, 3).map((pt, i) => (
+          <div key={i} style={{ flex:1, background:cardBg, borderRadius:10, display:"flex", alignItems:"stretch", overflow:"hidden" }}>
+            <div style={{ width:5, background:BRAND.green, flexShrink:0 }}/>
+            <div style={{ padding:"14px 20px", display:"flex", flexDirection:"column", justifyContent:"center" }}>
+              <div style={{ fontSize:46, fontWeight:900, color:BRAND.green, lineHeight:1, marginBottom:6 }}>{truncate(pt.stat, 12)}</div>
+              <div style={{ fontSize:15, fontWeight:600, color:textColor, marginBottom:4 }}>{truncate(pt.label, 48)}</div>
+              <div style={{ fontSize:12, fontWeight:400, color:mutedColor }}>{truncate(pt.source, 55)}</div>
+            </div>
+          </div>
+        ))}
+      </div>
 
       {/* Footer */}
-      <rect x={0} y={H-52} width={W} height={52} fill={isDark ? "rgba(0,184,43,0.1)" : "rgba(0,184,43,0.06)"}/>
-      <rect x={0} y={H-52} width={W} height={2} fill={BRAND.green}/>
-      <text x={64} y={H-22} fontFamily="Inter,sans-serif" fontWeight={600} fontSize={13} fill={isDark ? "rgba(255,255,255,0.55)" : BRAND.gray600}>
-        {truncate(points.length > 0 ? `Sources : ${points.map(p => p.source).join(" · ")}` : content.headline, 100)}
-      </text>
-    </>;
-  };
-
-  if (points.length > 0) {
-    return (
-      <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} xmlns="http://www.w3.org/2000/svg" style={{ width:"100%", height:"auto", display:"block" }}>
-        <defs><style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');`}</style></defs>
-        {renderDataLayout()}
-      </svg>
-    );
-  }
-
-  // Layouts classiques (sans données chiffrées)
-  const tsEls = (x) => headlines.map((l, i) =>
-    <tspan key={i} x={x} dy={i===0 ? 0 : hs*1.2}>{l}</tspan>
+      <div style={{ position:"absolute", bottom:0, left:0, right:0, height:50, background:footerBg, borderTop:`2px solid ${BRAND.green}`, display:"flex", alignItems:"center", padding:"0 64px" }}>
+        <span style={{ fontSize:12, fontWeight:600, color:mutedColor }}>
+          {truncate(points.length > 0 ? `Sources : ${points.map(p => p.source).join(" · ")}` : content.headline, 110)}
+        </span>
+      </div>
+    </div>
   );
 
-  const renderClassicLayout = () => {
-    switch(layout) {
-      case "hero-centered": {
-        const y0 = H/2 - hs*headlines.length/2 - 30;
-        const subY = y0 + headlines.length*hs*1.2 + 30;
-        return <>
-          <rect width={W} height={H} fill={BRAND.green}/>
-          {circleEl}{dotsEl}
-          <text x={W/2} y={y0} textAnchor="middle" fontFamily="Inter,sans-serif" fontWeight={800} fontSize={hs} fill={BRAND.white} letterSpacing="-1">{tsEls(W/2)}</text>
-          <rect x={W/2-30} y={subY-10} width={60} height={3} fill="rgba(255,255,255,0.5)" rx={2}/>
-          {content.subheadline && <text x={W/2} y={subY+30} textAnchor="middle" fontFamily="Inter,sans-serif" fontWeight={400} fontSize={22} fill="rgba(255,255,255,0.85)">{truncate(content.subheadline, 60)}</text>}
-        </>;
-      }
-      case "sidebar-accent": {
-        const sw = 12;
-        const textY = H/2 - (headlines.length*hs*1.15)/2 - 20;
-        return <>
-          <rect width={W} height={H} fill={BRAND.white}/>
-          <rect width={sw} height={H} fill={BRAND.green}/>
-          {circleEl}{dotsEl}
-          <text x={sw+100} y={textY} fontFamily="Inter,sans-serif" fontWeight={900} fontSize={hs} fill={BRAND.black} letterSpacing="-1">{tsEls(sw+100)}</text>
-          {content.subheadline && <text x={sw+100} y={textY+headlines.length*hs*1.15+35} fontFamily="Inter,sans-serif" fontWeight={400} fontSize={20} fill={BRAND.gray600}>{truncate(content.subheadline, 60)}</text>}
-        </>;
-      }
-      case "bottom-accent": {
-        const textY = H/2 - (headlines.length*hs*1.2)/2 - 20;
-        return <>
-          <rect width={W} height={H} fill={BRAND.black}/>
-          <rect y={H-8} width={W} height={8} fill={BRAND.green}/>
-          {circleEl}{dotsEl}
-          <text x={padding} y={textY} fontFamily="Inter,sans-serif" fontWeight={900} fontSize={hs} fill={BRAND.white} letterSpacing="-1">{tsEls(padding)}</text>
-          {content.subheadline && <text x={padding} y={textY+headlines.length*hs*1.2+35} fontFamily="Inter,sans-serif" fontWeight={400} fontSize={20} fill="rgba(255,255,255,0.7)">{truncate(content.subheadline, 60)}</text>}
-        </>;
-      }
-      case "frame-border": {
-        const ins = 20;
-        const textY = H/2 - (headlines.length*hs*1.2)/2 - 20;
-        return <>
-          <rect width={W} height={H} fill={BRAND.white}/>
-          <rect x={ins} y={ins} width={W-ins*2} height={H-ins*2} fill="none" stroke={BRAND.green} strokeWidth={6} rx={4}/>
-          {circleEl}
-          <text x={W/2} y={textY} textAnchor="middle" fontFamily="Inter,sans-serif" fontWeight={800} fontSize={hs} fill={BRAND.black} letterSpacing="-1">{tsEls(W/2)}</text>
-          <rect x={W/2-50} y={textY+headlines.length*hs*1.2+12} width={100} height={3} fill={BRAND.green} rx={2}/>
-          {content.subheadline && <text x={W/2} y={textY+headlines.length*hs*1.2+50} textAnchor="middle" fontFamily="Inter,sans-serif" fontWeight={400} fontSize={20} fill={BRAND.gray600}>{truncate(content.subheadline, 60)}</text>}
-        </>;
-      }
-      case "full-green-inverse": {
-        const textY = H/2 - (headlines.length*hs*1.15)/2 - 20;
-        return <>
-          <rect width={W} height={H} fill={BRAND.green}/>
-          <rect x={40} y={40} width={W-80} height={H-80} fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth={2} rx={4}/>
-          {circleEl}{dotsEl}
-          <text x={W/2} y={textY} textAnchor="middle" fontFamily="Inter,sans-serif" fontWeight={900} fontSize={hs} fill={BRAND.white} letterSpacing="-2">{tsEls(W/2)}</text>
-          {content.subheadline && <text x={W/2} y={textY+headlines.length*hs*1.15+40} textAnchor="middle" fontFamily="Inter,sans-serif" fontWeight={400} fontSize={22} fill="rgba(255,255,255,0.85)">{truncate(content.subheadline, 60)}</text>}
-        </>;
-      }
-      default: {
-        const textY = H/2 - (headlines.length*hs*1.2)/2 - 20;
-        return <>
-          <rect width={W} height={H} fill={BRAND.white}/>
-          <rect width={W} height={10} fill={BRAND.green}/>
-          {circleEl}{dotsEl}
-          <text x={W/2} y={textY} textAnchor="middle" fontFamily="Inter,sans-serif" fontWeight={800} fontSize={hs} fill={BRAND.black} letterSpacing="-1">{tsEls(W/2)}</text>
-          <rect x={W/2-45} y={textY+headlines.length*hs*1.2+15} width={90} height={4} fill={BRAND.green} rx={2}/>
-          {content.subheadline && <text x={W/2} y={textY+headlines.length*hs*1.2+56} textAnchor="middle" fontFamily="Inter,sans-serif" fontWeight={400} fontSize={20} fill={BRAND.gray600}>{truncate(content.subheadline, 60)}</text>}
-        </>;
-      }
-    }
-  };
+  if (layout === "data-dark") return <DataLayout
+    bg={BRAND.black} textColor={BRAND.white} mutedColor="rgba(255,255,255,0.5)"
+    cardBg="rgba(255,255,255,0.04)" borderColor="rgba(255,255,255,0.08)"
+    labelColor={BRAND.green} footerBg="rgba(0,184,43,0.1)"
+  />;
 
+  if (layout === "data-light") return <DataLayout
+    bg={BRAND.white} textColor={BRAND.black} mutedColor={BRAND.gray600}
+    cardBg="rgba(0,184,43,0.04)" borderColor="rgba(0,0,0,0.06)"
+    labelColor={BRAND.green} footerBg="rgba(0,184,43,0.06)"
+  />;
+
+  if (layout === "data-green") return <DataLayout
+    bg={BRAND.green} textColor={BRAND.white} mutedColor="rgba(255,255,255,0.7)"
+    cardBg="rgba(0,0,0,0.12)" borderColor="rgba(255,255,255,0.15)"
+    labelColor={BRAND.white} footerBg="rgba(0,0,0,0.15)"
+  />;
+
+  // ── Layouts classiques (sans données) ─────────────────────────────────────
+  if (layout === "hero-centered") return (
+    <div ref={visRef} style={{ ...base, background:BRAND.green, display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", textAlign:"center", padding:"0 80px" }}>
+      <div style={{ fontSize:headlineSize, fontWeight:900, color:BRAND.white, lineHeight:1.1, letterSpacing:"-2px", marginBottom:24 }}>{content.headline}</div>
+      <div style={{ width:60, height:4, background:"rgba(255,255,255,0.5)", borderRadius:2, marginBottom:24 }}/>
+      {content.subheadline && <div style={{ fontSize:22, fontWeight:400, color:"rgba(255,255,255,0.85)" }}>{truncate(content.subheadline, 80)}</div>}
+    </div>
+  );
+
+  if (layout === "sidebar-accent") return (
+    <div ref={visRef} style={{ ...base, background:BRAND.white, display:"flex" }}>
+      <div style={{ width:12, background:BRAND.green, flexShrink:0 }}/>
+      <div style={{ flex:1, display:"flex", flexDirection:"column", justifyContent:"center", padding:"60px 80px" }}>
+        <div style={{ fontSize:headlineSize, fontWeight:900, color:BRAND.black, lineHeight:1.1, letterSpacing:"-2px", marginBottom:24 }}>{content.headline}</div>
+        {content.subheadline && <div style={{ fontSize:22, fontWeight:400, color:BRAND.gray600 }}>{truncate(content.subheadline, 80)}</div>}
+      </div>
+    </div>
+  );
+
+  if (layout === "bottom-accent") return (
+    <div ref={visRef} style={{ ...base, background:BRAND.black, display:"flex", flexDirection:"column", justifyContent:"center", padding:"60px 80px" }}>
+      <div style={{ fontSize:headlineSize, fontWeight:900, color:BRAND.white, lineHeight:1.1, letterSpacing:"-2px", marginBottom:24 }}>{content.headline}</div>
+      {content.subheadline && <div style={{ fontSize:22, fontWeight:400, color:"rgba(255,255,255,0.7)", marginBottom:40 }}>{truncate(content.subheadline, 80)}</div>}
+      <div style={{ position:"absolute", bottom:0, left:0, right:0, height:8, background:BRAND.green }}/>
+    </div>
+  );
+
+  if (layout === "frame-border") return (
+    <div ref={visRef} style={{ ...base, background:BRAND.white, display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", textAlign:"center", padding:"60px 80px" }}>
+      <div style={{ position:"absolute", inset:20, border:`6px solid ${BRAND.green}`, borderRadius:8, pointerEvents:"none" }}/>
+      <div style={{ fontSize:headlineSize, fontWeight:900, color:BRAND.black, lineHeight:1.1, letterSpacing:"-2px", marginBottom:20 }}>{content.headline}</div>
+      <div style={{ width:100, height:3, background:BRAND.green, borderRadius:2, marginBottom:20 }}/>
+      {content.subheadline && <div style={{ fontSize:22, fontWeight:400, color:BRAND.gray600 }}>{truncate(content.subheadline, 80)}</div>}
+    </div>
+  );
+
+  // top-bar (default)
   return (
-    <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} xmlns="http://www.w3.org/2000/svg" style={{ width:"100%", height:"auto", display:"block" }}>
-      <defs><style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');`}</style></defs>
-      {renderClassicLayout()}
-    </svg>
+    <div ref={visRef} style={{ ...base, background:BRAND.white, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", textAlign:"center", padding:"60px 80px" }}>
+      <div style={{ position:"absolute", top:0, left:0, right:0, height:10, background:BRAND.green }}/>
+      <div style={{ fontSize:headlineSize, fontWeight:900, color:BRAND.black, lineHeight:1.1, letterSpacing:"-2px", marginBottom:20 }}>{content.headline}</div>
+      <div style={{ width:90, height:4, background:BRAND.green, borderRadius:2, marginBottom:20 }}/>
+      {content.subheadline && <div style={{ fontSize:22, fontWeight:400, color:BRAND.gray600 }}>{truncate(content.subheadline, 80)}</div>}
+    </div>
   );
 }
 
-// Téléchargement PNG via Canvas
-function downloadPNG(svgRef) {
-  const svg = svgRef.current;
-  if (!svg) return;
-  const W = 1200, H = 700;
-  const serializer = new XMLSerializer();
-  const svgStr = serializer.serializeToString(svg);
-  const svgBlob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
-  const url = URL.createObjectURL(svgBlob);
-  const img = new Image();
-  img.onload = () => {
-    const canvas = document.createElement("canvas");
-    canvas.width = W;
-    canvas.height = H;
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(img, 0, 0, W, H);
-    URL.revokeObjectURL(url);
+// ── Téléchargement PNG haute qualité via html-to-image ────────────────────────
+async function downloadPNG(visRef) {
+  const node = visRef.current;
+  if (!node) return;
+  try {
+    const dataUrl = await htmlToImage.toPng(node, {
+      width: 1200,
+      height: 700,
+      pixelRatio: 3, // 3× = qualité 3600×2100px
+      style: { fontFamily: "'Inter', -apple-system, sans-serif" },
+    });
     const a = document.createElement("a");
     a.download = `linkedin-visuel-${Date.now()}.png`;
-    a.href = canvas.toDataURL("image/png");
+    a.href = dataUrl;
     a.click();
-  };
-  img.src = url;
+  } catch (e) {
+    alert("Erreur lors du téléchargement. Réessayez.");
+  }
 }
 
 async function callClaude(subject, context, documentText, tone, url) {
@@ -283,15 +190,11 @@ function formatPost(post) {
   if (!post) return "";
   const parts = [
     post.emoji ? `${post.emoji} ${post.hook}` : post.hook,
-    "",
-    post.body,
-    "",
+    "", post.body, "",
     post.hashtags?.map(h => `#${h.replace(/^#/, "")}`).join(" ") || "",
   ];
-  if (post.sources && post.sources.length > 0) {
-    parts.push("");
-    parts.push("──");
-    parts.push("Sources : " + post.sources.join(" · "));
+  if (post.sources?.length > 0) {
+    parts.push("", "──", "Sources : " + post.sources.join(" · "));
   }
   return parts.filter(p => p !== undefined).join("\n");
 }
@@ -303,6 +206,7 @@ export default function App() {
   const [url, setUrl] = useState("");
   const [tone, setTone] = useState("professionnel");
   const [loading, setLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
   const [visualConfig, setVisualConfig] = useState(null);
@@ -310,7 +214,7 @@ export default function App() {
   const [dragOver, setDragOver] = useState(false);
   const [fileName, setFileName] = useState("");
   const [step, setStep] = useState("form");
-  const svgRef = useRef(null);
+  const visRef = useRef(null);
   const fileRef = useRef(null);
 
   const handleFile = useCallback((file) => {
@@ -323,7 +227,7 @@ export default function App() {
   }, []);
 
   const handleGenerate = async () => {
-    if (!subject.trim() || subject.trim().length < 5) { setError("Le sujet doit contenir au moins 5 caractères."); return; }
+    if (subject.trim().length < 5) { setError("Le sujet doit contenir au moins 5 caractères."); return; }
     setError(""); setLoading(true); setResult(null); setVisualConfig(null);
     try {
       const data = await callClaude(subject, context, documentText, tone, url);
@@ -337,13 +241,19 @@ export default function App() {
     }
   };
 
+  const handleDownload = async () => {
+    setDownloading(true);
+    await downloadPNG(visRef);
+    setDownloading(false);
+  };
+
   const resetToForm = () => { setStep("form"); setResult(null); setVisualConfig(null); setError(""); };
 
   if (step === "result" && result && visualConfig) {
     return (
       <div style={{ minHeight:"100vh", background:"#F4F5F7", fontFamily:"'Inter',-apple-system,sans-serif" }}>
         <Header/>
-        <main style={{ maxWidth:1060, margin:"0 auto", padding:"32px 20px" }}>
+        <main style={{ maxWidth:1100, margin:"0 auto", padding:"32px 20px" }}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:28 }}>
             <div>
               <button onClick={resetToForm} style={{ background:"none", border:"none", cursor:"pointer", fontSize:13, color:"#4B5563", fontFamily:"inherit", padding:0, marginBottom:6 }}>← Nouvelle génération</button>
@@ -352,7 +262,7 @@ export default function App() {
             <div style={{ background:"rgba(0,184,43,0.08)", border:"1px solid rgba(0,184,43,0.2)", borderRadius:20, padding:"7px 14px", fontSize:12, fontWeight:600, color:"#009622" }}>✓ Claude Haiku</div>
           </div>
 
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:24, alignItems:"start" }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1.2fr 1fr", gap:28, alignItems:"start" }}>
             {/* Visuel */}
             <div>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
@@ -360,11 +270,13 @@ export default function App() {
                 <span style={{ fontSize:10, background:"#F3F4F6", padding:"3px 8px", borderRadius:5, color:"#6B7280", fontWeight:600 }}>{visualConfig.layout}</span>
               </div>
               <div style={{ borderRadius:12, overflow:"hidden", border:"1px solid #E5E7EB", boxShadow:"0 4px 16px rgba(0,0,0,0.07)" }}>
-                <LinkedInVisual config={visualConfig} svgRef={svgRef}/>
+                <LinkedInVisual config={visualConfig} visRef={visRef}/>
               </div>
               <div style={{ display:"flex", gap:10, marginTop:10 }}>
                 <button onClick={() => setVisualConfig(generateVisualConfig(result.rawData.visual))} style={{ flex:1, padding:"11px 14px", background:"#fff", border:"1.5px solid #E5E7EB", borderRadius:9, fontSize:13, fontWeight:600, color:"#374151", cursor:"pointer", fontFamily:"inherit" }}>🔄 Nouveau layout</button>
-                <button onClick={() => downloadPNG(svgRef)} style={{ flex:1, padding:"11px 14px", background:BRAND.green, border:"none", borderRadius:9, fontSize:13, fontWeight:600, color:"#fff", cursor:"pointer", fontFamily:"inherit" }}>⬇️ Télécharger PNG</button>
+                <button onClick={handleDownload} disabled={downloading} style={{ flex:1, padding:"11px 14px", background: downloading?"#E5E7EB":BRAND.green, border:"none", borderRadius:9, fontSize:13, fontWeight:600, color: downloading?"#9CA3AF":"#fff", cursor: downloading?"not-allowed":"pointer", fontFamily:"inherit" }}>
+                  {downloading ? "⏳ Export..." : "⬇️ Télécharger PNG"}
+                </button>
               </div>
             </div>
 
@@ -384,6 +296,7 @@ export default function App() {
                 </div>
                 <div style={{ padding:"18px", fontSize:13, lineHeight:1.75, whiteSpace:"pre-wrap", maxHeight:340, overflowY:"auto", color:"#1F2937", fontFamily:"inherit" }}>{result.post}</div>
               </div>
+
               <button onClick={() => { navigator.clipboard.writeText(result.post).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2500); }); }} style={{ width:"100%", marginTop:10, padding:"13px 18px", border:"none", borderRadius:9, fontSize:13, fontWeight:700, color:"#fff", cursor:"pointer", fontFamily:"inherit", background: copied ? BRAND.greenDark : BRAND.green, display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
                 {copied ? "✓ Copié !" : "📋 Copier le post"}
               </button>
@@ -399,7 +312,7 @@ export default function App() {
                 </div>
               )}
 
-              {result.rawData?.post?.sources && result.rawData.post.sources.length > 0 && (
+              {result.rawData?.post?.sources?.length > 0 && (
                 <div style={{ marginTop:14, background:"#F9FAFB", border:"1px solid #E5E7EB", borderRadius:10, padding:"12px 14px" }}>
                   <p style={{ margin:"0 0 8px", fontSize:11, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.5px" }}>Sources</p>
                   {result.rawData.post.sources.map((s, i) => (
@@ -458,7 +371,7 @@ export default function App() {
           <div style={{ marginBottom:22 }}>
             <label style={{ display:"block", fontSize:11, fontWeight:700, color:"#1F2937", marginBottom:8, textTransform:"uppercase", letterSpacing:"0.6px" }}>Document de référence (optionnel)</label>
             <div onClick={() => fileRef.current?.click()} onDragOver={e => { e.preventDefault(); setDragOver(true); }} onDragLeave={() => setDragOver(false)} onDrop={e => { e.preventDefault(); setDragOver(false); handleFile(e.dataTransfer.files[0]); }} style={{ border:`2px dashed ${dragOver||fileName?BRAND.green:"#E5E7EB"}`, borderRadius:12, padding:"20px", background: dragOver||fileName?"rgba(0,184,43,0.04)":"#F9FAFB", cursor:"pointer", textAlign:"center" }}>
-              {fileName ? <div><span style={{ fontSize:20 }}>📄</span><p style={{ margin:"8px 0 0", fontSize:14, fontWeight:600, color:BRAND.green }}>{fileName}</p><p style={{ margin:"4px 0 0", fontSize:12, color:"#9CA3AF" }}>{documentText.length} caractères</p></div>
+              {fileName ? <div><span style={{ fontSize:20 }}>📄</span><p style={{ margin:"8px 0 0", fontSize:14, fontWeight:600, color:BRAND.green }}>{fileName}</p><p style={{ margin:"4px 0 0", fontSize:12, color:"#9CA3AF" }}>{documentText.length} car.</p></div>
               : <div><span style={{ fontSize:26 }}>📎</span><p style={{ margin:"8px 0 4px", fontSize:14, fontWeight:500, color:"#4B5563" }}>Glissez ou cliquez</p><p style={{ margin:0, fontSize:12, color:"#9CA3AF" }}>TXT, MD (max 5 MB)</p></div>}
               <input ref={fileRef} type="file" accept=".txt,.md" onChange={e => handleFile(e.target.files[0])} style={{ display:"none" }}/>
             </div>
