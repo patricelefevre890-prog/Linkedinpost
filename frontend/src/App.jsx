@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react'
+import React, { useState, useRef, useCallback } from "react";
 
 const BRAND = {
   green: "#00B82B", greenDark: "#009622", black: "#0A0A0A", white: "#FFFFFF",
@@ -46,7 +46,6 @@ function splitText(text, maxChars) {
   return lines.length ? lines : [""];
 }
 
-// ── Rendu SVG ─────────────────────────────────────────────────────────────────
 function LinkedInVisual({ config, svgRef }) {
   if (!config) return null;
   const W = 1200, H = 627;
@@ -74,37 +73,26 @@ function LinkedInVisual({ config, svgRef }) {
   const headlines = splitText(content.headline, 28);
   const points = content.points || [];
 
-  // Layout avec points de données (chiffres + sources) — layout principal enrichi
   const renderDataLayout = () => {
-    const textBg = isDark ? BRAND.black : BRAND.white;
     const textColor = isDark ? BRAND.white : BRAND.black;
     const textMuted = isDark ? "rgba(255,255,255,0.5)" : BRAND.gray600;
     const cardBg = isDark ? "rgba(255,255,255,0.04)" : "rgba(0,184,43,0.04)";
-
     const headlineLines = splitText(content.headline, 22);
     const headY = 160;
-
     return <>
       <rect width={W} height={H} fill={isDark ? BRAND.black : BRAND.white}/>
       {isDark && <rect width={W} height={8} fill={BRAND.green}/>}
       {circleEl}
-
-      {/* Zone titre gauche */}
       <text x={64} y={isDark ? 80 : 60} fontFamily="Inter,sans-serif" fontWeight={700} fontSize={13} fill={BRAND.green} letterSpacing="2">
         {content.subheadline?.toUpperCase() || "LINKEDIN CONTENT"}
       </text>
       <rect x={64} y={isDark ? 94 : 74} width={48} height={3} fill={BRAND.green} rx={2}/>
-
       {headlineLines.map((line, i) => (
         <text key={i} x={64} y={headY + i * hs * 1.15} fontFamily="Inter,sans-serif" fontWeight={900} fontSize={hs} fill={i === headlineLines.length - 1 ? BRAND.green : textColor} letterSpacing="-2">
           {line}
         </text>
       ))}
-
-      {/* Séparateur vertical */}
       <line x1={560} y1={50} x2={560} y2={570} stroke={isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"} strokeWidth={1}/>
-
-      {/* Cartes de données à droite */}
       {points.slice(0, 3).map((pt, i) => {
         const cardY = 50 + i * 178;
         return (
@@ -117,8 +105,6 @@ function LinkedInVisual({ config, svgRef }) {
           </g>
         );
       })}
-
-      {/* Footer sources */}
       <rect x={0} y={578} width={W} height={49} fill={isDark ? "rgba(0,184,43,0.1)" : "rgba(0,184,43,0.06)"}/>
       <rect x={0} y={578} width={W} height={2} fill={BRAND.green}/>
       <text x={64} y={607} fontFamily="Inter,sans-serif" fontWeight={600} fontSize={13} fill={isDark ? "rgba(255,255,255,0.55)" : BRAND.gray600}>
@@ -127,9 +113,7 @@ function LinkedInVisual({ config, svgRef }) {
     </>;
   };
 
-  // Si on a des points de données, on utilise toujours le layout enrichi
   if (points.length > 0) {
-    const isDarkLayout = ["hero-centered","full-green-inverse","bottom-accent","grid-minimal"].includes(layout);
     return (
       <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} xmlns="http://www.w3.org/2000/svg" style={{ width:"100%", height:"auto", display:"block" }}>
         <defs><style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');`}</style></defs>
@@ -138,7 +122,6 @@ function LinkedInVisual({ config, svgRef }) {
     );
   }
 
-  // Sinon, layouts classiques (pas de chiffres)
   const tsEls = (x) => headlines.map((l, i) =>
     <tspan key={i} x={x} dy={i===0 ? 0 : hs*1.2}>{l}</tspan>
   );
@@ -223,7 +206,7 @@ function LinkedInVisual({ config, svgRef }) {
   );
 }
 
-// ── Appel Claude Haiku — sans CTA, avec sources ────────────────────────────────
+// ── Appel via Netlify Function — sans CTA, avec sources ───────────────────────
 async function callClaude(subject, context, documentText, tone) {
   const res = await fetch("/.netlify/functions/generate", {
     method: "POST",
@@ -237,65 +220,6 @@ async function callClaude(subject, context, documentText, tone) {
   }
 
   return res.json();
-  };
-  const docCtx = documentText ? `\nContexte document : ${documentText.substring(0, 800)}` : "";
-  const addCtx = context ? `\nContexte additionnel : ${context.substring(0, 400)}` : "";
-
-  const prompt = `Sujet LinkedIn : "${subject}"
-Ton : ${toneLabels[tone] || "professionnel"}${docCtx}${addCtx}
-
-Génère un post LinkedIn (150-300 mots) + config visuelle.
-Post : Hook percutant → 3 paragraphes courts → 3 hashtags.
-Interdiction absolue de CTA, appel à l'action, invitation à commenter, partager ou suivre.
-La dernière phrase est une conclusion, jamais un appel à l'action.
-Si tu cites des chiffres ou anecdotes, fournis leur source réelle (auteur, publication, année).
-Si aucune source vérifiable n'existe, n'invente pas le chiffre.
-Visual : headline 6-8 mots, subheadline 12-15 mots, 2-3 points clés avec stat + label + source.
-Langue : Français uniquement.
-Réponds UNIQUEMENT en JSON valide sans backticks.
-Format exact :
-{
-  "post": {
-    "hook": "...",
-    "body": "...",
-    "hashtags": ["...","...","..."],
-    "emoji": "🔥",
-    "sources": ["Auteur ou organisme, Titre, Année"]
-  },
-  "visual": {
-    "headline": "...",
-    "subheadline": "...",
-    "points": [
-      { "stat": "chiffre impactant", "label": "explication courte", "source": "Source courte" }
-    ]
-  }
-}`;
-
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 1200,
-      system: `Tu es un expert en marketing LinkedIn et communication B2B francophone.
-Tu génères du contenu professionnel, engageant et authentique.
-Tu réponds UNIQUEMENT en JSON valide, sans markdown, sans backticks.
-Aucun CTA, aucune invitation à commenter, partager, liker ou suivre.
-La dernière phrase du post est toujours une conclusion, jamais un appel à l'action.
-Quand tu cites des chiffres ou anecdotes, tu fournis toujours leur source réelle.
-Si aucune source vérifiable n'existe, n'invente pas le chiffre.`,
-      messages: [{ role: "user", content: prompt }],
-    }),
-  });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error?.message || `Erreur API ${res.status}`);
-  }
-
-  const data = await res.json();
-  const raw = (data.content?.[0]?.text || "").trim().replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-  return JSON.parse(raw);
 }
 
 function formatPost(post) {
@@ -329,7 +253,6 @@ function downloadSVG(svgRef) {
   URL.revokeObjectURL(url);
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
 export default function App() {
   const [subject, setSubject] = useState("");
   const [context, setContext] = useState("");
@@ -364,7 +287,7 @@ export default function App() {
       setVisualConfig(generateVisualConfig(data.visual));
       setStep("result");
     } catch (err) {
-      setError(err.message || "Erreur lors de la génération. Vérifiez votre clé API.");
+      setError(err.message || "Erreur lors de la génération. Réessayez.");
     } finally {
       setLoading(false);
     }
@@ -386,7 +309,6 @@ export default function App() {
           </div>
 
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:24, alignItems:"start" }}>
-            {/* Visuel */}
             <div>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
                 <span style={{ fontSize:11, fontWeight:700, color:"#1F2937", textTransform:"uppercase", letterSpacing:"0.6px" }}>Visuel LinkedIn</span>
@@ -401,7 +323,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Post */}
             <div>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
                 <span style={{ fontSize:11, fontWeight:700, color:"#1F2937", textTransform:"uppercase", letterSpacing:"0.6px" }}>Post LinkedIn</span>
@@ -421,7 +342,6 @@ export default function App() {
                 {copied ? "✓ Copié !" : "📋 Copier le post"}
               </button>
 
-              {/* Hashtags */}
               {result.rawData?.post?.hashtags && (
                 <div style={{ marginTop:14 }}>
                   <p style={{ margin:"0 0 8px", fontSize:11, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.5px" }}>Hashtags</p>
@@ -433,7 +353,6 @@ export default function App() {
                 </div>
               )}
 
-              {/* Sources */}
               {result.rawData?.post?.sources && result.rawData.post.sources.length > 0 && (
                 <div style={{ marginTop:14, background:"#F9FAFB", border:"1px solid #E5E7EB", borderRadius:10, padding:"12px 14px" }}>
                   <p style={{ margin:"0 0 8px", fontSize:11, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.5px" }}>Sources</p>
