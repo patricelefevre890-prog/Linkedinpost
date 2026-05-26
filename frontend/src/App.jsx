@@ -16,7 +16,7 @@ function pickRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 function generateVisualConfig(visualData) {
   return {
     layout: pickRandom(LAYOUTS),
-    headlineSize: pickRandom([44, 52, 60, 68]),
+    headlineSize: pickRandom([44, 50, 56]),
     padding: pickRandom([48, 56, 64]),
     content: {
       headline: visualData?.headline || "Votre titre ici",
@@ -46,9 +46,16 @@ function splitText(text, maxChars) {
   return lines.length ? lines : [""];
 }
 
+// Tronque un texte à maxChars caractères avec ...
+function truncate(text, maxChars) {
+  if (!text) return "";
+  return text.length > maxChars ? text.substring(0, maxChars - 1) + "…" : text;
+}
+
 function LinkedInVisual({ config, svgRef }) {
   if (!config) return null;
-  const W = 1200, H = 627;
+  // Hauteur augmentée à 700 pour loger 3 cartes confortablement
+  const W = 1200, H = 700;
   const { layout, headlineSize: hs, padding, content, decorative } = config;
   const isDark = ["hero-centered","full-green-inverse","bottom-accent"].includes(layout);
   const isGreen = ["hero-centered","full-green-inverse"].includes(layout);
@@ -70,45 +77,74 @@ function LinkedInVisual({ config, svgRef }) {
     return <>{dots}</>;
   })() : null;
 
-  const headlines = splitText(content.headline, 28);
+  const headlines = splitText(content.headline, 24);
   const points = content.points || [];
 
+  // Layout enrichi avec données — hauteur 700px, 3 cartes bien espacées
   const renderDataLayout = () => {
     const textColor = isDark ? BRAND.white : BRAND.black;
     const textMuted = isDark ? "rgba(255,255,255,0.5)" : BRAND.gray600;
     const cardBg = isDark ? "rgba(255,255,255,0.04)" : "rgba(0,184,43,0.04)";
-    const headlineLines = splitText(content.headline, 22);
-    const headY = 160;
+
+    // Subheadline tronqué à 40 chars max pour le label du haut
+    const subLabel = truncate(content.subheadline?.toUpperCase() || "LINKEDIN CONTENT", 40);
+
+    // Headline sur 2 lignes max
+    const headlineLines = splitText(content.headline, 20).slice(0, 3);
+    const headY = 140;
+    const cardHeight = 168;
+    const cardGap = 16;
+    const cardStartY = 40;
+
     return <>
       <rect width={W} height={H} fill={isDark ? BRAND.black : BRAND.white}/>
       {isDark && <rect width={W} height={8} fill={BRAND.green}/>}
       {circleEl}
-      <text x={64} y={isDark ? 80 : 60} fontFamily="Inter,sans-serif" fontWeight={700} fontSize={13} fill={BRAND.green} letterSpacing="2">
-        {content.subheadline?.toUpperCase() || "LINKEDIN CONTENT"}
+
+      {/* Label haut gauche — tronqué */}
+      <text x={64} y={isDark ? 76 : 56} fontFamily="Inter,sans-serif" fontWeight={700} fontSize={12} fill={BRAND.green} letterSpacing="1">
+        {subLabel}
       </text>
-      <rect x={64} y={isDark ? 94 : 74} width={48} height={3} fill={BRAND.green} rx={2}/>
+      <rect x={64} y={isDark ? 88 : 68} width={40} height={3} fill={BRAND.green} rx={2}/>
+
+      {/* Headline principale */}
       {headlineLines.map((line, i) => (
-        <text key={i} x={64} y={headY + i * hs * 1.15} fontFamily="Inter,sans-serif" fontWeight={900} fontSize={hs} fill={i === headlineLines.length - 1 ? BRAND.green : textColor} letterSpacing="-2">
+        <text key={i} x={64} y={headY + i * hs * 1.2} fontFamily="Inter,sans-serif" fontWeight={900} fontSize={hs} fill={i === headlineLines.length - 1 ? BRAND.green : textColor} letterSpacing="-1.5">
           {line}
         </text>
       ))}
-      <line x1={560} y1={50} x2={560} y2={570} stroke={isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"} strokeWidth={1}/>
+
+      {/* Séparateur vertical */}
+      <line x1={540} y1={30} x2={540} y2={H-50} stroke={isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"} strokeWidth={1}/>
+
+      {/* 3 cartes de données à droite — bien espacées */}
       {points.slice(0, 3).map((pt, i) => {
-        const cardY = 50 + i * 178;
+        const cardY = cardStartY + i * (cardHeight + cardGap);
         return (
           <g key={i}>
-            <rect x={592} y={cardY} width={572} height={158} rx={10} fill={cardBg}/>
-            <rect x={592} y={cardY} width={5} height={158} rx={2} fill={BRAND.green}/>
-            <text x={620} y={cardY + 58} fontFamily="Inter,sans-serif" fontWeight={900} fontSize={52} fill={BRAND.green}>{pt.stat}</text>
-            <text x={620} y={cardY + 92} fontFamily="Inter,sans-serif" fontWeight={600} fontSize={17} fill={textColor}>{pt.label}</text>
-            <text x={620} y={cardY + 118} fontFamily="Inter,sans-serif" fontWeight={400} fontSize={13} fill={textMuted}>{pt.source}</text>
+            <rect x={572} y={cardY} width={592} height={cardHeight} rx={10} fill={cardBg}/>
+            <rect x={572} y={cardY} width={5} height={cardHeight} rx={2} fill={BRAND.green}/>
+            {/* Stat */}
+            <text x={600} y={cardY + 62} fontFamily="Inter,sans-serif" fontWeight={900} fontSize={50} fill={BRAND.green}>
+              {truncate(pt.stat, 10)}
+            </text>
+            {/* Label — tronqué à 45 chars */}
+            <text x={600} y={cardY + 98} fontFamily="Inter,sans-serif" fontWeight={600} fontSize={16} fill={textColor}>
+              {truncate(pt.label, 45)}
+            </text>
+            {/* Source — tronquée à 50 chars */}
+            <text x={600} y={cardY + 124} fontFamily="Inter,sans-serif" fontWeight={400} fontSize={12} fill={textMuted}>
+              {truncate(pt.source, 50)}
+            </text>
           </g>
         );
       })}
-      <rect x={0} y={578} width={W} height={49} fill={isDark ? "rgba(0,184,43,0.1)" : "rgba(0,184,43,0.06)"}/>
-      <rect x={0} y={578} width={W} height={2} fill={BRAND.green}/>
-      <text x={64} y={607} fontFamily="Inter,sans-serif" fontWeight={600} fontSize={13} fill={isDark ? "rgba(255,255,255,0.55)" : BRAND.gray600}>
-        {points.length > 0 ? `Sources : ${points.map(p => p.source).join(" · ")}` : content.headline}
+
+      {/* Footer */}
+      <rect x={0} y={H-52} width={W} height={52} fill={isDark ? "rgba(0,184,43,0.1)" : "rgba(0,184,43,0.06)"}/>
+      <rect x={0} y={H-52} width={W} height={2} fill={BRAND.green}/>
+      <text x={64} y={H-22} fontFamily="Inter,sans-serif" fontWeight={600} fontSize={13} fill={isDark ? "rgba(255,255,255,0.55)" : BRAND.gray600}>
+        {truncate(points.length > 0 ? `Sources : ${points.map(p => p.source).join(" · ")}` : content.headline, 100)}
       </text>
     </>;
   };
@@ -122,6 +158,7 @@ function LinkedInVisual({ config, svgRef }) {
     );
   }
 
+  // Layouts classiques (sans données chiffrées)
   const tsEls = (x) => headlines.map((l, i) =>
     <tspan key={i} x={x} dy={i===0 ? 0 : hs*1.2}>{l}</tspan>
   );
@@ -134,10 +171,9 @@ function LinkedInVisual({ config, svgRef }) {
         return <>
           <rect width={W} height={H} fill={BRAND.green}/>
           {circleEl}{dotsEl}
-          <line x1={padding} y1={H/2-15} x2={W-padding} y2={H/2-15} stroke="rgba(255,255,255,0.2)" strokeWidth={1}/>
           <text x={W/2} y={y0} textAnchor="middle" fontFamily="Inter,sans-serif" fontWeight={800} fontSize={hs} fill={BRAND.white} letterSpacing="-1">{tsEls(W/2)}</text>
           <rect x={W/2-30} y={subY-10} width={60} height={3} fill="rgba(255,255,255,0.5)" rx={2}/>
-          {content.subheadline && <text x={W/2} y={subY+30} textAnchor="middle" fontFamily="Inter,sans-serif" fontWeight={400} fontSize={22} fill="rgba(255,255,255,0.85)">{content.subheadline}</text>}
+          {content.subheadline && <text x={W/2} y={subY+30} textAnchor="middle" fontFamily="Inter,sans-serif" fontWeight={400} fontSize={22} fill="rgba(255,255,255,0.85)">{truncate(content.subheadline, 60)}</text>}
         </>;
       }
       case "sidebar-accent": {
@@ -146,10 +182,9 @@ function LinkedInVisual({ config, svgRef }) {
         return <>
           <rect width={W} height={H} fill={BRAND.white}/>
           <rect width={sw} height={H} fill={BRAND.green}/>
-          <circle cx={sw+50} cy={H/2} r={80} fill="rgba(0,184,43,0.05)"/>
           {circleEl}{dotsEl}
           <text x={sw+100} y={textY} fontFamily="Inter,sans-serif" fontWeight={900} fontSize={hs} fill={BRAND.black} letterSpacing="-1">{tsEls(sw+100)}</text>
-          {content.subheadline && <text x={sw+100} y={textY+headlines.length*hs*1.15+35} fontFamily="Inter,sans-serif" fontWeight={400} fontSize={21} fill={BRAND.gray600}>{content.subheadline}</text>}
+          {content.subheadline && <text x={sw+100} y={textY+headlines.length*hs*1.15+35} fontFamily="Inter,sans-serif" fontWeight={400} fontSize={20} fill={BRAND.gray600}>{truncate(content.subheadline, 60)}</text>}
         </>;
       }
       case "bottom-accent": {
@@ -159,7 +194,7 @@ function LinkedInVisual({ config, svgRef }) {
           <rect y={H-8} width={W} height={8} fill={BRAND.green}/>
           {circleEl}{dotsEl}
           <text x={padding} y={textY} fontFamily="Inter,sans-serif" fontWeight={900} fontSize={hs} fill={BRAND.white} letterSpacing="-1">{tsEls(padding)}</text>
-          {content.subheadline && <text x={padding} y={textY+headlines.length*hs*1.2+35} fontFamily="Inter,sans-serif" fontWeight={400} fontSize={22} fill="rgba(255,255,255,0.7)">{content.subheadline}</text>}
+          {content.subheadline && <text x={padding} y={textY+headlines.length*hs*1.2+35} fontFamily="Inter,sans-serif" fontWeight={400} fontSize={20} fill="rgba(255,255,255,0.7)">{truncate(content.subheadline, 60)}</text>}
         </>;
       }
       case "frame-border": {
@@ -171,7 +206,7 @@ function LinkedInVisual({ config, svgRef }) {
           {circleEl}
           <text x={W/2} y={textY} textAnchor="middle" fontFamily="Inter,sans-serif" fontWeight={800} fontSize={hs} fill={BRAND.black} letterSpacing="-1">{tsEls(W/2)}</text>
           <rect x={W/2-50} y={textY+headlines.length*hs*1.2+12} width={100} height={3} fill={BRAND.green} rx={2}/>
-          {content.subheadline && <text x={W/2} y={textY+headlines.length*hs*1.2+50} textAnchor="middle" fontFamily="Inter,sans-serif" fontWeight={400} fontSize={22} fill={BRAND.gray600}>{content.subheadline}</text>}
+          {content.subheadline && <text x={W/2} y={textY+headlines.length*hs*1.2+50} textAnchor="middle" fontFamily="Inter,sans-serif" fontWeight={400} fontSize={20} fill={BRAND.gray600}>{truncate(content.subheadline, 60)}</text>}
         </>;
       }
       case "full-green-inverse": {
@@ -181,7 +216,7 @@ function LinkedInVisual({ config, svgRef }) {
           <rect x={40} y={40} width={W-80} height={H-80} fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth={2} rx={4}/>
           {circleEl}{dotsEl}
           <text x={W/2} y={textY} textAnchor="middle" fontFamily="Inter,sans-serif" fontWeight={900} fontSize={hs} fill={BRAND.white} letterSpacing="-2">{tsEls(W/2)}</text>
-          {content.subheadline && <text x={W/2} y={textY+headlines.length*hs*1.15+40} textAnchor="middle" fontFamily="Inter,sans-serif" fontWeight={400} fontSize={24} fill="rgba(255,255,255,0.85)">{content.subheadline}</text>}
+          {content.subheadline && <text x={W/2} y={textY+headlines.length*hs*1.15+40} textAnchor="middle" fontFamily="Inter,sans-serif" fontWeight={400} fontSize={22} fill="rgba(255,255,255,0.85)">{truncate(content.subheadline, 60)}</text>}
         </>;
       }
       default: {
@@ -192,7 +227,7 @@ function LinkedInVisual({ config, svgRef }) {
           {circleEl}{dotsEl}
           <text x={W/2} y={textY} textAnchor="middle" fontFamily="Inter,sans-serif" fontWeight={800} fontSize={hs} fill={BRAND.black} letterSpacing="-1">{tsEls(W/2)}</text>
           <rect x={W/2-45} y={textY+headlines.length*hs*1.2+15} width={90} height={4} fill={BRAND.green} rx={2}/>
-          {content.subheadline && <text x={W/2} y={textY+headlines.length*hs*1.2+56} textAnchor="middle" fontFamily="Inter,sans-serif" fontWeight={400} fontSize={22} fill={BRAND.gray600}>{content.subheadline}</text>}
+          {content.subheadline && <text x={W/2} y={textY+headlines.length*hs*1.2+56} textAnchor="middle" fontFamily="Inter,sans-serif" fontWeight={400} fontSize={20} fill={BRAND.gray600}>{truncate(content.subheadline, 60)}</text>}
         </>;
       }
     }
@@ -204,6 +239,31 @@ function LinkedInVisual({ config, svgRef }) {
       {renderClassicLayout()}
     </svg>
   );
+}
+
+// Téléchargement PNG via Canvas
+function downloadPNG(svgRef) {
+  const svg = svgRef.current;
+  if (!svg) return;
+  const W = 1200, H = 700;
+  const serializer = new XMLSerializer();
+  const svgStr = serializer.serializeToString(svg);
+  const svgBlob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
+  const url = URL.createObjectURL(svgBlob);
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img, 0, 0, W, H);
+    URL.revokeObjectURL(url);
+    const a = document.createElement("a");
+    a.download = `linkedin-visuel-${Date.now()}.png`;
+    a.href = canvas.toDataURL("image/png");
+    a.click();
+  };
+  img.src = url;
 }
 
 async function callClaude(subject, context, documentText, tone, url) {
@@ -293,6 +353,7 @@ export default function App() {
           </div>
 
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:24, alignItems:"start" }}>
+            {/* Visuel */}
             <div>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
                 <span style={{ fontSize:11, fontWeight:700, color:"#1F2937", textTransform:"uppercase", letterSpacing:"0.6px" }}>Visuel LinkedIn</span>
@@ -301,9 +362,13 @@ export default function App() {
               <div style={{ borderRadius:12, overflow:"hidden", border:"1px solid #E5E7EB", boxShadow:"0 4px 16px rgba(0,0,0,0.07)" }}>
                 <LinkedInVisual config={visualConfig} svgRef={svgRef}/>
               </div>
-              <button onClick={() => setVisualConfig(generateVisualConfig(result.rawData.visual))} style={{ width:"100%", marginTop:10, padding:"11px 14px", background:"#fff", border:"1.5px solid #E5E7EB", borderRadius:9, fontSize:13, fontWeight:600, color:"#374151", cursor:"pointer", fontFamily:"inherit" }}>🔄 Nouveau layout</button>
+              <div style={{ display:"flex", gap:10, marginTop:10 }}>
+                <button onClick={() => setVisualConfig(generateVisualConfig(result.rawData.visual))} style={{ flex:1, padding:"11px 14px", background:"#fff", border:"1.5px solid #E5E7EB", borderRadius:9, fontSize:13, fontWeight:600, color:"#374151", cursor:"pointer", fontFamily:"inherit" }}>🔄 Nouveau layout</button>
+                <button onClick={() => downloadPNG(svgRef)} style={{ flex:1, padding:"11px 14px", background:BRAND.green, border:"none", borderRadius:9, fontSize:13, fontWeight:600, color:"#fff", cursor:"pointer", fontFamily:"inherit" }}>⬇️ Télécharger PNG</button>
+              </div>
             </div>
 
+            {/* Post */}
             <div>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
                 <span style={{ fontSize:11, fontWeight:700, color:"#1F2937", textTransform:"uppercase", letterSpacing:"0.6px" }}>Post LinkedIn</span>
@@ -363,7 +428,6 @@ export default function App() {
         </div>
 
         <div style={{ background:"#fff", borderRadius:18, border:"1px solid #E5E7EB", padding:36, boxShadow:"0 4px 20px rgba(0,0,0,0.05)" }}>
-
           <div style={{ marginBottom:22 }}>
             <label style={{ display:"block", fontSize:11, fontWeight:700, color:"#1F2937", marginBottom:8, textTransform:"uppercase", letterSpacing:"0.6px" }}>Sujet du post *</label>
             <textarea value={subject} onChange={e => setSubject(e.target.value.substring(0,500))} placeholder="Ex: L'importance de la musique dans un bar..." rows={3} style={{ width:"100%", padding:"12px 14px", border:`1.5px solid ${subject.length>0?BRAND.green:"#E5E7EB"}`, borderRadius:10, outline:"none", resize:"vertical", fontFamily:"inherit", fontSize:14, boxSizing:"border-box", lineHeight:1.6 }}/>
