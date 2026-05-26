@@ -1,0 +1,7 @@
+{
+  "name": "netlify-functions",
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.52.0"
+  }
+}
