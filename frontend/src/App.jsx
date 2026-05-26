@@ -225,11 +225,18 @@ function LinkedInVisual({ config, svgRef }) {
 
 // ── Appel Claude Haiku — sans CTA, avec sources ────────────────────────────────
 async function callClaude(subject, context, documentText, tone) {
-  const toneLabels = {
-    professionnel: "professionnel et expert",
-    inspirant: "inspirant et motivant",
-    éducatif: "éducatif et pédagogique",
-    storytelling: "narratif avec storytelling",
+  const res = await fetch("/.netlify/functions/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ subject, context, documentText, tone }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Erreur ${res.status}`);
+  }
+
+  return res.json();
   };
   const docCtx = documentText ? `\nContexte document : ${documentText.substring(0, 800)}` : "";
   const addCtx = context ? `\nContexte additionnel : ${context.substring(0, 400)}` : "";
