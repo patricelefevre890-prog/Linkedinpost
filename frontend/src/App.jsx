@@ -6,7 +6,7 @@ const BRAND = {
 };
 
 async function callClaude(subject, context, documentText, tone, url) {
-  const res = await fetch("/.netlify/functions/generate", {
+  const res = await fetch("https://us-central1-linkgenerator-4b0db.cloudfunctions.net/generate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ subject, context, documentText, tone, url }),
