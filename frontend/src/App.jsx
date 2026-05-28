@@ -6,7 +6,7 @@ const BRAND = {
 };
 
 async function callClaude(subject, context, documentText, tone, url) {
-  const res = await fetch("https://us-central1-linkgenerator-4b0db.cloudfunctions.net/generate", {
+  const res = await fetch("https://generate-d7ifqhvira-uc.a.run.app", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ subject, context, documentText, tone, url }),
@@ -45,7 +45,7 @@ export default function App() {
   const [tone, setTone] = useState("professionnel");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [versions, setVersions] = useState(null); // { factuel, storytelling, opinion }
+  const [versions, setVersions] = useState(null);
   const [activeVersion, setActiveVersion] = useState("factuel");
   const [copied, setCopied] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -67,7 +67,6 @@ export default function App() {
     setError(""); setLoading(true); setVersions(null);
     try {
       const data = await callClaude(subject, context, documentText, tone, url);
-      // data contient { factuel, storytelling, opinion } — chacun est un post formaté
       setVersions({
         factuel: { post: formatPost(data.factuel), rawData: data.factuel },
         storytelling: { post: formatPost(data.storytelling), rawData: data.storytelling },
@@ -87,7 +86,6 @@ export default function App() {
   const currentPost = versions?.[activeVersion]?.post || "";
   const currentRaw = versions?.[activeVersion]?.rawData;
 
-  // ── Vue résultat ────────────────────────────────────────────────────────────
   if (step === "result" && versions) {
     return (
       <div style={{ minHeight:"100vh", background:"#F4F5F7", fontFamily:"'Inter',-apple-system,sans-serif" }}>
@@ -101,7 +99,6 @@ export default function App() {
             <div style={{ background:"rgba(0,184,43,0.08)", border:"1px solid rgba(0,184,43,0.2)", borderRadius:20, padding:"7px 14px", fontSize:12, fontWeight:600, color:"#009622" }}>✓ Claude Haiku</div>
           </div>
 
-          {/* Sélecteur de versions */}
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12, marginBottom:20 }}>
             {Object.entries(ANGLE_LABELS).map(([key, { label, icon, desc }]) => (
               <button key={key} onClick={() => { setActiveVersion(key); setCopied(false); }} style={{
@@ -116,7 +113,6 @@ export default function App() {
             ))}
           </div>
 
-          {/* Preview du post actif */}
           <div style={{ background:"#fff", borderRadius:16, border:`2px solid ${BRAND.green}`, overflow:"hidden", boxShadow:"0 4px 20px rgba(0,0,0,0.06)", marginBottom:14 }}>
             <div style={{ padding:"14px 22px", borderBottom:"1px solid #E5E7EB", display:"flex", alignItems:"center", gap:12 }}>
               <div style={{ width:44, height:44, borderRadius:"50%", background:"linear-gradient(135deg,#00B82B,#009622)", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:800, fontSize:17, flexShrink:0 }}>V</div>
@@ -133,12 +129,10 @@ export default function App() {
             </div>
           </div>
 
-          {/* Copier */}
           <button onClick={() => { navigator.clipboard.writeText(currentPost).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2500); }); }} style={{ width:"100%", padding:"16px 18px", border:"none", borderRadius:12, fontSize:15, fontWeight:700, color:"#fff", cursor:"pointer", fontFamily:"inherit", background: copied ? BRAND.greenDark : BRAND.green, display:"flex", alignItems:"center", justifyContent:"center", gap:8, marginBottom:14 }}>
             {copied ? "✓ Copié dans le presse-papier !" : "📋 Copier cette version"}
           </button>
 
-          {/* Hashtags */}
           {currentRaw?.hashtags && (
             <div style={{ background:"#fff", borderRadius:12, border:"1px solid #E5E7EB", padding:"16px 18px", marginBottom:12 }}>
               <p style={{ margin:"0 0 10px", fontSize:11, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.5px" }}>Hashtags</p>
@@ -150,7 +144,6 @@ export default function App() {
             </div>
           )}
 
-          {/* Sources */}
           {currentRaw?.sources?.length > 0 && (
             <div style={{ background:"#fff", borderRadius:12, border:"1px solid #E5E7EB", padding:"16px 18px", marginBottom:12 }}>
               <p style={{ margin:"0 0 10px", fontSize:11, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.5px" }}>Sources</p>
@@ -168,7 +161,6 @@ export default function App() {
     );
   }
 
-  // ── Vue formulaire ──────────────────────────────────────────────────────────
   return (
     <div style={{ minHeight:"100vh", background:"#F4F5F7", fontFamily:"'Inter',-apple-system,sans-serif" }}>
       <Header/>
@@ -230,7 +222,7 @@ export default function App() {
           <button onClick={handleGenerate} disabled={loading || subject.trim().length < 5} style={{ width:"100%", padding:"16px 24px", border:"none", borderRadius:12, fontSize:15, fontWeight:700, cursor: loading||subject.trim().length<5?"not-allowed":"pointer", fontFamily:"inherit", background: loading||subject.trim().length<5?"#E5E7EB":BRAND.green, color: loading||subject.trim().length<5?"#9CA3AF":"#fff", display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
             {loading ? <><Spinner/> Génération des 3 versions...</> : "✨ Générer 3 versions du post"}
           </button>
-          <p style={{ textAlign:"center", fontSize:11, color:"#9CA3AF", margin:"10px 0 0" }}>Claude Haiku · ~$0.002 par génération (3 versions)</p>
+          <p style={{ textAlign:"center", fontSize:11, color:"#9CA3AF", margin:"10px 0 0" }}>Claude Haiku · ~$0.002 par génération</p>
         </div>
       </main>
     </div>
